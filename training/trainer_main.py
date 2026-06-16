@@ -10,5 +10,7 @@
 
 import torch
 from FDI_localization.config.config import Config
+from FDI_localization.deep_models.models import TimeseriesDataset, FeatureAttention, FeatureAttentionOverTime, AttentionLSTMAutoencoder
+from FDI_localization.training.trainer import Trainer
 
 config = Config()
