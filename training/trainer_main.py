@@ -9,28 +9,24 @@
 
     USAGE:
     run this code from the main directory of the project using the command:
+    python -m training.trainer_main
+
+
+    BEWARE DO NOT USE THE FOLLOWING COMMAND TO RUN THE CODE AS IT WILL CAUSE ISSUES WITH RELATIVE PATHS:
+    THIS COMMAND WILL CAUSE PYTHON TO SET THE CURRENT WORKIGN DIRECTORY TO THE TRAINING FOLDER 
     python training/trainer_main.py 
 
 '''
 
+
+import torch
+import pandas as pd
+import numpy as np
+from torch.utils.data import DataLoader, Dataset
 from training.trainer import Trainer
 from deep_models.models import TimeseriesDataset, FeatureAttention, FeatureAttentionOverTime, AttentionLSTMAutoencoder
-from configurations.config import DataPreparer
-from configurations.config import Config
-from torch.utils.data import DataLoader, Dataset
-import numpy as np
-import pandas as pd
-import torch
+from configurations.config import DataPreparer, Config
 import os
-import sys
-# Ensure the project root is on sys.path when running this script directly
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# change the current working directory to the project root to ensure relative paths work correctly
-
-# current working directory is C:\Users\kvasi\OneDrive - purdue.edu\projects\Autonomous Control System\codes\windowSHAP-Kalman\FDI_localization
-cwd = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\codes\\windowSHAP-Kalman\\FDI_localization"
-os.chdir(cwd)
 
 
 def main():
