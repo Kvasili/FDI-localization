@@ -14,13 +14,14 @@ import numpy as np
 
 @dataclass
 class Config:
-    epochs: int = 30
+    epochs: int = 5
     batch_size: int = 64
     seq_len: int = 10
     learning_rate: float = 0.001
     models_folder: str = "./models"
     save_models: bool = True
-    model_name: str = "LSTM_autoencoder_for_FDI_10.pth"
+    # model_name: str = "LSTM_autoencoder_for_FDI_10.pth"
+    model_name: str = "test.pth"
     normalization_model: str = "min_max_scaler_AE_for_FDI.save"
 
     path_for_normalization_summary: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\global_feature_min_max_summary.csv"
@@ -32,9 +33,12 @@ class Config:
     # columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-1-cr", "rr-active-state",
     #                       "rr-position", "ss1-active-state", "ss1-position", "ss2-active-state", "ss2-position"])
 
-    columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-3-pwr", "nfd-4-flux",
-                                                   "rr-active-state", "rr-position", "ss1-active-state", "ss1-position",
-                                                   "ss2-active-state", "ss2-position"])  #
+    # columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-3-pwr", "nfd-4-flux",
+    #                                                "rr-active-state", "rr-position", "ss1-active-state", "ss1-position",
+    #                                                "ss2-active-state", "ss2-position"])  #
+
+    columns: list = field(default_factory=lambda: ["nfd-1-cps", "nfd-2-log", "nfd-3-pwr", "nfd-4-flux",
+                                                   "rr-active-state", "rr-position", "ss1-active-state", "ss1-position", "ss2-active-state", "ss2-position"])
 
 
 class DataPreparer:
@@ -66,7 +70,7 @@ class DataPreparer:
             sequences.append(df[i:i + seq_size])
         return np.array(sequences)
 
-    def to_sequences_(self, df, seq_size):
+    def to_sequences_(self, df, seq_size, Index_col="Unnamed: 0"):
         """
         Creates sequences from the data by checking if the index is consecutive.
         Only sequences with consecutive indices are included.
@@ -81,7 +85,7 @@ class DataPreparer:
             # Check if all indices are consecutive
             if np.all(np.diff(seq_index) == 1):
                 seq = df.iloc[i:(i + seq_size)]
-                data_values.append(seq.drop(columns=["Index"]).values)
+                data_values.append(seq.drop(columns=[Index_col]).values)
 
         return np.array(data_values)
 

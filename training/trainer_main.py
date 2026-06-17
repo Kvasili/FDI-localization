@@ -20,6 +20,7 @@
 
 
 import torch
+import torch.nn as nn
 import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
@@ -63,7 +64,60 @@ def main():
         # Concatenate into a single array for training
     # Shape: [total_sequences, 10, num_features]
     all_trainX = np.concatenate(all_trainX, axis=0)
-    print(f"Total training sequences: {len(all_trainX)}")
+    print(f"Total training sequences: {all_trainX.shape}")
+
+    ##################  VALIDATION DATASET  ##########################
+    all_valX = []
+
+    for root, dirs, files in os.walk(path_for_validation):
+        for file in files:
+            if file.lower().endswith('.csv'):
+
+                filename = os.path.join(root, file)
+                # print(f"Processing file: {filename}")
+
+                df_data = data_preparer.load_data(filename, columns, 1)
+
+                # Normalize the data
+                df_data.loc[:, columns] = data_preparer.min_max_normalizer(
+                    df_data, columns, config.path_for_normalization_summary, mode="normalize")
+
+                valX = data_preparer.to_sequences(
+                    df_data, seq_size=config.seq_len)
+
+                if valX is not None and len(valX) > 0:
+                    all_valX.append(valX)
+
+        # Concatenate into a single array for training
+    # Shape: [total_sequences, 40, num_features]
+    all_valX = np.concatenate(all_valX, axis=0)
+    print("Total validation sequences:", all_valX.shape)
+
+    train_dataset = TimeseriesDataset(all_trainX)
+    val_dataset = TimeseriesDataset(all_valX)
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(
+        val_dataset, batch_size=config.batch_size, shuffle=False)
+
+    model = AttentionLSTMAutoencoder(
+        input_dim=all_trainX.shape[2], seq_len=all_trainX.shape[1])
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    # initialize the trainer and fit the model
+    trainer = Trainer(model, optimizer, criterion, device)
+    train_losses, val_losses = trainer.fit(
+        train_loader, val_loader, epochs=config.epochs)
+    trainer.save_model(os.path.join(
+        config.models_folder, config.model_name))
+
+    # plot training and validation losses
+    trainer.plot_train_val_losses(train_losses, val_losses)
 
 
 if __name__ == "__main__":

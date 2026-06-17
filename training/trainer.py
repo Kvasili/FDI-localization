@@ -23,9 +23,9 @@ class Trainer:
         epoch_loss = 0.0
 
         for batch in train_loader:
-            batch = batch.to(self.device)
+            batch = batch.float().to(self.device)
             self.optimizer.zero_grad()
-            outputs = self.model(batch)
+            outputs, attn_w, attn_m = self.model(batch)
             loss = self.criterion(outputs, batch)
             loss.backward()
             self.optimizer.step()
@@ -41,8 +41,8 @@ class Trainer:
 
         with torch.no_grad():
             for batch in val_loader:
-                batch = batch.to(self.device)
-                outputs = self.model(batch)
+                batch = batch.float().to(self.device)
+                outputs, attn_w, attn_m = self.model(batch)
                 loss = self.criterion(outputs, batch)
                 val_loss += loss.item()
 
@@ -73,3 +73,17 @@ class Trainer:
         # if model is saved, print a message
         if torch.save(self.model.state_dict(), path):
             print(f'Model saved to {path}')
+
+    def plot_train_val_losses(self, train_losses, val_losses):
+        '''  Plot the training and validation losses over epochs   '''
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(train_losses, label='Train Loss')
+        plt.plot(val_losses, label='Validation Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss over Epochs')
+        plt.legend()
+        plt.grid()
+        plt.show()
