@@ -1,3 +1,11 @@
+'''
+
+    This code contains  the configuration settings for the FDI localization model and a DataPreparer 
+    class that provides methods for loading, splitting, and preprocessing the data, 
+    including min-max normalization based on pre-computed min and max values for each feature.
+
+'''
+
 
 from dataclasses import dataclass, field
 import pandas as pd
@@ -15,7 +23,11 @@ class Config:
     model_name: str = "LSTM_autoencoder_for_FDI_10.pth"
     normalization_model: str = "min_max_scaler_AE_for_FDI.save"
 
+    path_for_normalization_summary: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\global_feature_min_max_summary.csv"
+
     path_for_data = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\real_dataset1_final.csv"
+    path_for_training = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\training"
+    path_for_validation = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\validation"
 
     # columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-1-cr", "rr-active-state",
     #                       "rr-position", "ss1-active-state", "ss1-position", "ss2-active-state", "ss2-position"])
@@ -26,6 +38,9 @@ class Config:
 
 
 class DataPreparer:
+
+    def __init__(self, config):
+        self.config = config
 
     def load_data(self, path_for_data, features, percentage):
         df = pd.read_csv(path_for_data)
@@ -70,7 +85,7 @@ class DataPreparer:
 
         return np.array(data_values)
 
-    def min_max_normalizer(self, df, feature_list, min_max_csv_path):
+    def min_max_normalizer(self, df, feature_list, min_max_csv_path, mode="normalize"):
         """
         Normalize selected features in a DataFrame using Min-Max scaling,
         based on precomputed min-max values from a CSV file.
@@ -79,6 +94,7 @@ class DataPreparer:
             df (pd.DataFrame): The DataFrame containing the features to be normalized.
             feature_list (list): A list of features to normalize.
             min_max_csv: Path to the CSV file containing the min and max values for each feature.
+            mode (str): The mode of operation ("normalize" or "denormalize").
 
         Returns:
             pd.DataFrame: A DataFrame with the same structure as `df`, but with normalized values for selected features.
@@ -102,8 +118,12 @@ class DataPreparer:
 
                 # Avoid division by zero
                 if max_val != min_val:
-                    normalized_df[feature] = (
-                        df[feature] - min_val) / (max_val - min_val)
+                    if mode == "normalize":
+                        normalized_df[feature] = (
+                            df[feature] - min_val) / (max_val - min_val)
+                    elif mode == "denormalize":
+                        normalized_df[feature] = (
+                            df[feature] * (max_val - min_val)) + min_val
                 else:
                     normalized_df[feature] = 0  # Assign 0 if no range
 
