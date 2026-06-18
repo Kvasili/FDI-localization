@@ -19,10 +19,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.utils.data import DataLoader
 from training.trainer import Trainer
-from deep_models.models import TimeseriesDataset, AttentionLSTMAutoencoder
-from configurations.config import DataPreparer, Config
+from deep_models.models import AttentionLSTMAutoencoder
+from configurations.config import Config
+from data.data_preparer import DataPreparer
 import os
 
 
