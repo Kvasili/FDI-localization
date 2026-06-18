@@ -6,8 +6,9 @@
 
 '''
 
-
+from torch.utils.data import DataLoader
 from dataclasses import dataclass, field
+from deep_models.models import TimeseriesDataset
 import pandas as pd
 import numpy as np
 
@@ -63,8 +64,13 @@ class DataPreparer:
         return df[:split_index], df[split_index:]
 
     def to_sequences(self, df, seq_size=10):
-        """Convert data to sequences of given size.
-            Data format is expected to be a pandas DataFrame with the first column as index and the rest as features."""
+        """
+        Convert data to sequences of given size.
+            Data format is expected to be a pandas DataFrame.
+
+        Returns a numpy array of shape (num_sequences, seq_size, num_features).
+
+            """
         sequences = []
         for i in range(len(df) - seq_size + 1):
             sequences.append(df[i:i + seq_size])
@@ -88,6 +94,23 @@ class DataPreparer:
                 data_values.append(seq.drop(columns=[Index_col]).values)
 
         return np.array(data_values)
+
+    def prepare_tensors(self, sequences, batch_size, shuffle=False):
+        '''  Convert sequences to PyTorch tensors and create a DataLoader for training or validation.   
+
+        Parameters:
+            sequences (numpy array): The input data sequences to be converted to tensors.
+            batch_size (int): The batch size for the DataLoader.
+            shuffle (bool): Whether to shuffle the data in the DataLoader (default: False).
+        Returns:
+            DataLoader: A PyTorch DataLoader containing the prepared tensors for training or validation.
+        '''
+
+        dataset = TimeseriesDataset(sequences)
+        loader = DataLoader(
+            dataset, batch_size, shuffle=shuffle)
+
+        return loader
 
     def min_max_normalizer(self, df, feature_list, min_max_csv_path, mode="normalize"):
         """

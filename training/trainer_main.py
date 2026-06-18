@@ -14,7 +14,7 @@
 
     BEWARE DO NOT USE THE FOLLOWING COMMAND TO RUN THE CODE AS IT WILL CAUSE ISSUES WITH RELATIVE PATHS:
     THIS COMMAND WILL CAUSE PYTHON TO SET THE CURRENT WORKIGN DIRECTORY TO THE TRAINING FOLDER 
-    
+
     python training/trainer_main.py 
 
 '''
@@ -22,11 +22,10 @@
 
 import torch
 import torch.nn as nn
-import pandas as pd
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from training.trainer import Trainer
-from deep_models.models import TimeseriesDataset, FeatureAttention, FeatureAttentionOverTime, AttentionLSTMAutoencoder
+from deep_models.models import TimeseriesDataset, AttentionLSTMAutoencoder
 from configurations.config import DataPreparer, Config
 import os
 
@@ -90,18 +89,17 @@ def main():
                     all_valX.append(valX)
 
         # Concatenate into a single array for training
-    # Shape: [total_sequences, 40, num_features]
+
     all_valX = np.concatenate(all_valX, axis=0)
     print("Total validation sequences:", all_valX.shape)
 
-    train_dataset = TimeseriesDataset(all_trainX)
-    val_dataset = TimeseriesDataset(all_valX)
+    # Prepare DataLoaders for training and validation
+    train_loader = DataPreparer.prepare_tensors(
+        all_trainX, batch_size=config.batch_size, shuffle=False)
+    val_loader = DataPreparer.prepare_tensors(
+        all_valX, batch_size=config.batch_size, shuffle=True)
 
-    train_loader = DataLoader(
-        train_dataset, batch_size=config.batch_size, shuffle=True)
-    val_loader = DataLoader(
-        val_dataset, batch_size=config.batch_size, shuffle=False)
-
+    # Initialize the model, criterion, optimizer, and device
     model = AttentionLSTMAutoencoder(
         input_dim=all_trainX.shape[2], seq_len=all_trainX.shape[1])
     criterion = nn.MSELoss()
