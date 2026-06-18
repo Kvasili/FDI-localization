@@ -9,13 +9,13 @@
 
     USAGE:
     run this code from the main directory of the project using the command:
-    python -m training.trainer_main
+    python -m training.train_autoencoder
 
 
     BEWARE DO NOT USE THE FOLLOWING COMMAND TO RUN THE CODE AS IT WILL CAUSE ISSUES WITH RELATIVE PATHS:
     THIS COMMAND WILL CAUSE PYTHON TO SET THE CURRENT WORKIGN DIRECTORY TO THE TRAINING FOLDER 
 
-    python training/trainer_main.py 
+    python training/train_autoencoder.py
 
 '''
 
@@ -63,6 +63,10 @@ def main():
 
         # Concatenate into a single array for training
     # Shape: [total_sequences, 10, num_features]
+    if len(all_trainX) == 0:
+        raise ValueError(
+            f"No training data found in {path_for_training}. Please check the path and ensure it contains CSV files.")
+
     all_trainX = np.concatenate(all_trainX, axis=0)
     print(f"Total training sequences: {all_trainX.shape}")
 
@@ -89,6 +93,10 @@ def main():
                     all_valX.append(valX)
 
         # Concatenate into a single array for training
+
+    if len(all_valX) == 0:
+        raise ValueError(
+            f"No validation data found in {path_for_validation}. Please check the path and ensure it contains CSV files.")
 
     all_valX = np.concatenate(all_valX, axis=0)
     print("Total validation sequences:", all_valX.shape)
