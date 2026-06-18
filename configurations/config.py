@@ -15,7 +15,7 @@ import numpy as np
 
 @dataclass
 class Config:
-    epochs: int = 15
+    epochs: int = 2
     batch_size: int = 64
     seq_len: int = 10
     learning_rate: float = 0.001
@@ -27,19 +27,34 @@ class Config:
 
     path_for_normalization_summary: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\global_feature_min_max_summary.csv"
 
-    path_for_data = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\real_dataset1_final.csv"
-    path_for_training = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\training"
-    path_for_validation = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\validation"
+    path_for_data: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\real_dataset1_final.csv"
+    path_for_training: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\training"
+    path_for_validation: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\validation"
 
     # columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-1-cr", "rr-active-state",
     #                       "rr-position", "ss1-active-state", "ss1-position", "ss2-active-state", "ss2-position"])
 
-    # columns: list = field(default_factory=lambda: ["Unnamed: 0", "nfd-1-cps", "nfd-3-pwr", "nfd-4-flux",
-    #                                                "rr-active-state", "rr-position", "ss1-active-state", "ss1-position",
-    #                                                "ss2-active-state", "ss2-position"])  #
-
     columns: list = field(default_factory=lambda: ["nfd-1-cps", "nfd-2-log", "nfd-3-pwr", "nfd-4-flux",
                                                    "rr-active-state", "rr-position", "ss1-active-state", "ss1-position", "ss2-active-state", "ss2-position"])
+
+    def save(self, path):
+        '''  Save the configuration settings to a JSON file.   '''
+        import json
+        import os
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        with open(path, 'w') as f:
+            json.dump(self.__dict__, f, indent=4)
+
+    def load(self, path):
+        '''  Load the configuration settings from a JSON file.   '''
+        import json
+
+        with open(path, 'r') as f:
+            config_dict = json.load(f)
+
+        self.__dict__.update(config_dict)
 
 
 class DataPreparer:
@@ -95,7 +110,7 @@ class DataPreparer:
 
         return np.array(data_values)
 
-    def prepare_tensors(self, sequences, batch_size, shuffle=False):
+    def create_dataloader(self, sequences, batch_size, shuffle=False):
         '''  Convert sequences to PyTorch tensors and create a DataLoader for training or validation.   
 
         Parameters:

@@ -94,10 +94,10 @@ def main():
     print("Total validation sequences:", all_valX.shape)
 
     # Prepare DataLoaders for training and validation
-    train_loader = DataPreparer.prepare_tensors(
-        all_trainX, batch_size=config.batch_size, shuffle=False)
-    val_loader = DataPreparer.prepare_tensors(
-        all_valX, batch_size=config.batch_size, shuffle=True)
+    train_loader = data_preparer.create_dataloader(
+        all_trainX, batch_size=config.batch_size, shuffle=True)
+    val_loader = data_preparer.create_dataloader(
+        all_valX, batch_size=config.batch_size, shuffle=False)
 
     # Initialize the model, criterion, optimizer, and device
     model = AttentionLSTMAutoencoder(
@@ -117,6 +117,10 @@ def main():
 
     # plot training and validation losses
     trainer.plot_train_val_losses(train_losses, val_losses)
+
+    # save the configuration used for the taining in json frile
+    config.save(os.path.join(config.models_folder,
+                config.model_name + "_config.json"))
 
 
 if __name__ == "__main__":
