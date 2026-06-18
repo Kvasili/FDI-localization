@@ -16,7 +16,7 @@
     
 '''
 
-from configurations.config import Config
+from configurations.inference_config import Config
 from deep_models.models import AttentionLSTMAutoencoder
 from data.data_preparer import DataPreparer
 import pandas as pd
