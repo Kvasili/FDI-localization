@@ -15,18 +15,15 @@ import numpy as np
 
 @dataclass
 class Config:
-    epochs: int = 2
+    epochs: int = 15
     batch_size: int = 64
     seq_len: int = 10
     learning_rate: float = 0.001
     models_folder: str = "./models"
     save_models: bool = True
     # model_name: str = "LSTM_autoencoder_for_FDI_10.pth"
-    model_name: str = "test_v2.pth"
-    normalization_model: str = "min_max_scaler_AE_for_FDI.save"
-
+    model_name: str = "LSTM_autoencoder_for_FDI_10_v5.pth"
     path_for_normalization_summary: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\global_feature_min_max_summary.csv"
-
     path_for_data: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\real_dataset1_final.csv"
     path_for_training: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\training"
     path_for_validation: str = "C:\\Users\\kvasi\\OneDrive - purdue.edu\\projects\\Autonomous Control System\\data\\Full cycles and Startups\\Power_Cycle_with_Startup\\validation"

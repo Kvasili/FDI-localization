@@ -1,16 +1,13 @@
 
 '''
-
     This is the main trainign script for the FDI localization model. 
     It defines the Trainer class which encapsulates the training and evaluation logic for the model. 
     The Trainer class has methods for training the model on a given dataset, 
     evaluating the model on a validation set, and fitting the model for a specified number of epochs.
 
-
     USAGE:
     run this code from the main directory of the project using the command:
     python -m training.train_autoencoder
-
 
     BEWARE DO NOT USE THE FOLLOWING COMMAND TO RUN THE CODE AS IT WILL CAUSE ISSUES WITH RELATIVE PATHS:
     THIS COMMAND WILL CAUSE PYTHON TO SET THE CURRENT WORKIGN DIRECTORY TO THE TRAINING FOLDER 
@@ -18,7 +15,6 @@
     python training/train_autoencoder.py
 
 '''
-
 
 import torch
 import torch.nn as nn
@@ -68,7 +64,9 @@ def main():
             f"No training data found in {path_for_training}. Please check the path and ensure it contains CSV files.")
 
     all_trainX = np.concatenate(all_trainX, axis=0)
-    print(f"Total training sequences: {all_trainX.shape}")
+    print(f"[INFO] Sequence length: {config.seq_len}")
+    print(f"[INFO] Number of features: {all_trainX.shape[2]}")
+    print(f"[INFO] Number of training sequences: {all_trainX.shape[0]}")
 
     ##################  VALIDATION DATASET  ##########################
     all_valX = []
@@ -99,7 +97,9 @@ def main():
             f"No validation data found in {path_for_validation}. Please check the path and ensure it contains CSV files.")
 
     all_valX = np.concatenate(all_valX, axis=0)
-    print("Total validation sequences:", all_valX.shape)
+    print(f"[INFO] Sequence length: {config.seq_len}")
+    print(f"[INFO] Number of features: {all_valX.shape[2]}")
+    print(f"[INFO] Number of validation sequences: {all_valX.shape[0]}")
 
     # Prepare DataLoaders for training and validation
     train_loader = data_preparer.create_dataloader(
