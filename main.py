@@ -18,6 +18,8 @@
 
 from configurations.inference_config import Config
 from deep_models.models import AttentionLSTMAutoencoder
+from deep_models.localization import AutoencoderDetector
+from explainability.shapBinding import SHAPBinding
 from data.data_preparer import DataPreparer
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,7 +28,6 @@ import torch
 import torch.nn as nn
 
 import os
-from explainability.WindowSHAP.windowshap import StationaryWindowSHAP
 from scipy.linalg import expm
 import csv
 
@@ -50,80 +51,6 @@ def connect_to_db():
     )
 
 
-class SHAPBinding:
-
-    '''A binding class to compute SHAP values for LSTM sequences with Pytorch models
-       and WindowSHAP package
-    '''
-
-    def __init__(self, model, sub_window_size):
-        self.model = model
-        self.sub_window_size = sub_window_size
-
-    def prediction_function(self, input_data):
-        """
-        Computes the MAE reconstruction error for the input sequence.
-        Expects input_data of shape: (1, window_size, num_features)
-        """
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.eval()
-
-        with torch.no_grad():
-            # Convert numpy array to torch tensor if needed
-            if isinstance(input_data, np.ndarray):
-                input_data = torch.tensor(input_data, dtype=torch.float32)
-
-            input_data = input_data.to(device)
-            # print('input data:', input_data)
-            outputs, _, _ = self.model(input_data)
-
-            reconstruction_errors = torch.mean(
-                # mean over features, shape: [batch, seq_len]
-                torch.abs(input_data - outputs), dim=2)
-            # reconstruction_errors = torch.mean(
-            #     torch.abs(input_data[:, selected_indices] - outputs[:, selected_indices]), dim=2)
-            # mean over time, shape: [batch]
-            mae = torch.mean(reconstruction_errors, dim=1)
-            # print('MAE:', mae)
-        return mae.cpu().numpy().reshape(-1, 1)
-
-    def explain_anomaly(self, current_seq, background_seq):
-        """
-        Computes SHAP values for the current sequence if an anomaly is detected.
-        Both current_seq and background_seq must be of shape (1, window_size, num_features)
-        """
-        explainer = StationaryWindowSHAP(
-            model=self.prediction_function,
-            window_len=self.sub_window_size,
-            B_ts=background_seq.cpu().numpy(),
-            test_ts=current_seq.cpu().numpy(),
-            model_type='lstm'
-        )
-        return explainer.shap_values()
-
-    def CreateBackground(self, data, scaler=None):
-
-        # if scaler:
-        # if data are scaled unscale them
-        data = scaler.inverse_transform(data.squeeze())
-
-        b_ts = data.copy()
-        for i in [3, 5, 7]:
-            # hardcode the active states to be 0 - no movement
-            b_ts[:, i] = 0
-        for i in [0, 1, 2, 4, 6, 8]:
-            # set the rest of the signals with the first value of the sequence
-            b_ts[:, i] = data[0, i]
-
-        b_ts = scaler.transform(b_ts)
-
-        b_ts = np.array(b_ts[None, :, :])
-
-        # print('Background Shape:', np.shape(b_ts))
-
-        return b_ts
-
-
 def load_data(filename, cols_to_be_read, percentage):
     df = pd.read_csv(filename)
     df.dropna(inplace=True)
@@ -134,49 +61,6 @@ def load_data(filename, cols_to_be_read, percentage):
         return df[:number_of_rows]
     else:
         raise ValueError("values in percentage should be in the range (0, 1]")
-
-
-def reconstruct_error(input_data, model, selected_indices=[0, 1, 2, 3, 4, 5, 6, 7, 8]):
-    """
-    Computes the MAE reconstruction error for the input sequence.
-    Expects input_data of shape: (1, window_size, num_features)
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.eval()
-
-    with torch.no_grad():
-        # Convert numpy array to torch tensor if needed
-        if isinstance(input_data, np.ndarray):
-            input_data = torch.tensor(input_data, dtype=torch.float32)
-
-            # Ensure batch dimension
-        if input_data.dim() == 2:
-            # (seq_len, num_features) -> (1, seq_len, num_features)
-            input_data = input_data.unsqueeze(0)
-
-        input_data = input_data.to(device)
-        # print('input data:', input_data)
-        outputs, attn_weights, attn_matrix = model(input_data)
-
-        # shape: (seq_len, num_features)
-        input_array = input_data[0].detach().cpu().numpy()
-        output_array = outputs[0].detach().cpu().numpy()
-
-        # Select only desired columns
-        input_sel = input_array[:, selected_indices]
-        output_sel = output_array[:, selected_indices]
-
-        # Compute absolute error
-        errors = np.abs(input_sel - output_sel)
-
-        # Extract mean reconstruction error over the selected features and all time steps
-        # mean over time for each feature
-        mae_per_feature = errors.mean(axis=0)
-
-        # Mean over all time steps and selected features -> single scalar
-        mae = errors.mean()
-
-        return [mae, outputs.detach().cpu().numpy(), attn_weights.detach().cpu().numpy(), attn_matrix.detach().cpu().numpy()]
 
 
 def compute_reactivity(SS1, SS2, RR, No, baseline_reactiviy):
@@ -338,7 +222,7 @@ def main():
 
     # Load the models for the KF and the autoencoder
     model_ = AttentionLSTMAutoencoder(
-        input_dim=df.shape[1], seq_len=config.seq_len)
+        input_dim=len(config.columns), seq_len=config.seq_len)
 
     model_.load_state_dict(torch.load(os.path.join(
         config.models_folder, config.model_name), map_location=device))
@@ -506,10 +390,12 @@ def main():
                 current_seq = normalized_sequence.reshape(
                     1, config.seq_len, config.input_dim)
 
-                error = reconstruct_error(current_seq, model_)[0]
-                output_seq = reconstruct_error(current_seq, model_)[1]
-                attn_weights = reconstruct_error(current_seq, model_)[2]
-                attn_matrix = reconstruct_error(current_seq, model_)[3]
+                detector = AutoencoderDetector(model_)
+
+                error, output_seq, attn_weights, attn_matrix = detector.reconstruct_error(
+                    current_seq)
+                # attn_weights = reconstruct_error(current_seq, model_)[2]
+                # attn_matrix = reconstruct_error(current_seq, model_)[3]
 
                 # extract first value of last row of the reconstucted sequence
                 nfd_1_seconstruced = output_seq[0, -1, 0]
@@ -588,6 +474,7 @@ def main():
         plt.title("True vs KF Estimated Neutron Population")
         plt.legend()
         plt.show()
+
 
     # Run the function
 if __name__ == "__main__":
