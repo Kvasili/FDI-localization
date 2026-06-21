@@ -11,7 +11,7 @@
 
     
     @USAGE
-    python Attention_autoencoder_evaluate_Kalman_SHAP_DB.py
+    python main.py
 
     
 '''
@@ -22,6 +22,7 @@ from deep_models.localization import AutoencoderDetector
 from explainability.shapBinding import SHAPBinding
 from data.data_preparer import DataPreparer
 from physics.reactor_kinetics import KalmanPKE, build_continuous_pke, compute_reactivity, linear_model_predict
+from database_scripts.csv_to_postgres import DatabaseHandler
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -29,21 +30,8 @@ import numpy as np
 import torch
 import os
 import csv
-import psycopg2
 import warnings
 warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy")
-
-
-# Connect to PostgreSQL database
-def connect_to_db():
-    '''Connect to the PostgreSQL database using psycopg2.'''
-    return psycopg2.connect(
-        dbname="reactor_data",
-        user="postgres",
-        password="ellia94",
-        host="localhost",
-        port="5432"
-    )
 
 
 def load_data(filename, cols_to_be_read, percentage):
@@ -79,6 +67,7 @@ def main():
     headers = ['time'] + config.columns + ['kf-estimated-cps'] + ['kf-estimated-nf2-log'] + ['kf-estimated-nf3-pwr'] + ['kf-estimated-nf4-flux'] + \
         ['reconstruction_error'] + shap_names
 
+    # Run this once to create the CSV file with headers if it doesn't exist
     csv_filename = config.csv_file
     if not os.path.isfile(csv_filename):
         with open(csv_filename, 'w', newline='') as f:
@@ -122,8 +111,15 @@ def main():
     R = np.array([[(0.001 * N0)**2]])  # 1% measurement noise
     KF = KalmanPKE(x0, P0, Q, R, dt, L, beta_total, beta_i, lambda_i, C)
 
-    # Connect to the database
-    conn = connect_to_db()
+    # Connect to the database the password and the rest credentials should be stored in environment variables or a config file for security, but hardcoded here for simplicity
+    database_handler = DatabaseHandler(
+        dbname="reactor_data", user="postgres", password="ellia94", host="localhost", port="5432")
+    conn = database_handler.connect_to_db()
+
+    if conn is None:
+        print("Failed to connect to database.")
+        return
+
     conn.set_session(autocommit=True)
     window_size = config.seq_len
     df_buffer = pd.DataFrame()
@@ -262,8 +258,8 @@ def main():
                     current_seq)
                 # attn_weights = reconstruct_error(current_seq, model_)[2]
                 # attn_matrix = reconstruct_error(current_seq, model_)[3]
-
                 # extract first value of last row of the reconstucted sequence
+
                 nfd_1_seconstruced = output_seq[0, -1, 0]
                 # print(
                 #     f"Reconstructed nfd-1-cps at current step: {nfd_1_seconstruced}")
@@ -346,8 +342,6 @@ def main():
 if __name__ == "__main__":
 
     main()
-
-
 '''
 
     LSTM Autoencoder for sensor diagnostics for windowSHAP analysis 

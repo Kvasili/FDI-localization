@@ -2,3 +2,5 @@ explainability/WindowSHAP
 models
 outputs
 datasets
+database_scripts
+configurations/helper
