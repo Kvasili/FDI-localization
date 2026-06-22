@@ -11,7 +11,7 @@
 
     
     @USAGE
-    python main.py
+    python main_averaging.py
 
     
 '''
@@ -49,7 +49,12 @@ def load_data(filename, cols_to_be_read, percentage):
 def main():
 
     mode = ["Kalman", "averaging"]
-    mode = mode[0]
+    mode = mode[1]
+    print(mode)
+
+    # read steady average data for the control signals
+    avg_df = pd.read_csv("./datasets/Power_Cycle_4794407_avg.csv")
+    print(avg_df)
 
     # current time at the beggining of the script execution
     start_time = time.time()
@@ -67,7 +72,7 @@ def main():
     # Write header once (only if file doesn't exist)
     # shap fields names
     shap_names = [f'SHAP_{f}' for f in config.columns]
-    headers = ['time'] + config.columns + ['kf-estimated-cps'] + ['kf-estimated-nf2-log'] + ['kf-estimated-nf3-pwr'] + ['kf-estimated-nf4-flux'] + \
+    headers = ['time'] + config.columns + ['avg-estimated-cps'] + ['avg-estimated-nf2-log'] + ['avg-estimated-nf3-pwr'] + ['avg-estimated-nf4-flux'] + \
         ['reconstruction_error'] + shap_names
 
     # Run this once to create the CSV file with headers if it doesn't exist
@@ -90,30 +95,6 @@ def main():
     # instantiate windowSHAP
     window_shap = SHAPBinding(model=model_, sub_window_size=5)
 
-    # PKE parameters
-    L, beta_total, beta_i, lambda_i, C = build_continuous_pke()
-    # Sampling interval:
-    dt = 1.0  # seconds
-
-    # Need to change this in the future
-    #######################################
-    N0 = df["nfd-1-cps"].iloc[0]
-    #######################################
-
-    # --- Initial conditions ---
-    C0_6g = (beta_i / lambda_i) * N0 / L
-    print(f"Initial delayed neutron precursor concentrations: {C0_6g}")
-    x0 = np.concatenate(([N0], C0_6g))
-    P0 = np.eye(7) * 1.0
-    Q = np.eye(7) * 1e-4  # encodes how much we trust the model
-    # adjust to 1% of nominal neutron count
-    Q[0, 0] = (0.02 * N0)**2   # 2% uncertainty in neutron dynamics
-
-    # R = np.array([[1e-2]])
-    # 0.5% measurement noise
-    R = np.array([[(0.001 * N0)**2]])  # 1% measurement noise
-    KF = KalmanPKE(x0, P0, Q, R, dt, L, beta_total, beta_i, lambda_i, C)
-
     # Connect to the database the password and the rest credentials should be stored in environment variables or a config file for security, but hardcoded here for simplicity
     database_handler = DatabaseHandler(
         dbname="reactor_data", user="postgres", password="ellia94", host="localhost", port="5432")
@@ -132,7 +113,6 @@ def main():
     true_vals = []
     est_vals = []
     errors = []
-    nfd_1_cps_est = 0
 
     try:
         cursor = conn.cursor()
@@ -177,87 +157,35 @@ def main():
                 row = {}
                 current_row = df_buffer.copy().iloc[start_idx-1, :].to_dict()
 
-                meas = df_buffer.loc[start_idx, "nfd-1-cps"]
-                SS1 = df_buffer.loc[start_idx, "ss1-position"]
-                SS2 = df_buffer.loc[start_idx, "ss2-position"]
-                RR = df_buffer.loc[start_idx, "rr-position"]
-                rho = compute_reactivity(
-                    SS1, SS2, RR, nfd_1_cps_est, baseline_reactiviy=5710)
-
-                if start_idx < 2500:
-                    ''' In the early steps, we have a lot of uncertainty in the KF state and we want to use the measurements to correct it. 
-                    After some time, we can start relying more on the model predictions and less on the measurements, 
-                    especially if we suspect that the measurements might be noisy or unreliable during anomalies. 
-                    This is a common strategy in Kalman filtering where you can adjust the measurement noise covariance R or even skip measurement updates based on certain conditions. 
-                    Here, we simply choose to use measurements for the first 2500 steps and then switch to prediction-only mode.'''
-                    # print(f"KF Update at step {start_idx}")
-                    nfd_1_cps_est = KF.step_with_measurement(meas, rho)[0]
-                    nf2_log_est, nf3_pwr_est, nf4_flux_est = linear_model_predict(
-                        nfd_1_cps_est)
-
-                else:
-                    # print(f"KF Prediction only at step {start_idx}")
-                    nfd_1_cps_est = KF.step_no_measurement(rho)[0]
-                    nf2_log_est, nf3_pwr_est, nf4_flux_est = linear_model_predict(
-                        nfd_1_cps_est)
-                    # time.sleep(0.05)
-
-                # print(f"Step {i}: Measured={meas}, Estimated={nfd_1_cps_est}")
-                true_vals.append(meas)
-                est_vals.append(nfd_1_cps_est)
-
-                df_buffer.at[start_idx, "kf-estimated-cps"] = nfd_1_cps_est
-                df_buffer.at[start_idx, "kf-estimated-nf2-log"] = nf2_log_est
-                df_buffer.at[start_idx, "kf-estimated-nf3-pwr"] = nf3_pwr_est
-                df_buffer.at[start_idx, "kf-estimated-nf4-flux"] = nf4_flux_est
-
                 # Get the sequneces of the 10 prior seconds
                 sequence_df = df_buffer.loc[start_idx -
                                             window_size + 1: start_idx].copy()
+                # This will get rid of the Index column
+                sequence_df = sequence_df.loc[:, config.columns]
 
-                # print(f"ID: {df_buffer.loc[start_idx, 'time']}")
-                # # print(f"meas={meas}, SS1={SS1}, SS2={SS2}, RR={RR}")
-                # print("Database Sequence (last 10 rows):")
+                # print('current sequence:')
                 # print(sequence_df)
-                # time.sleep(0.05)
+                background_df = sequence_df.copy()
+                background_df.iloc[:, 0:4] = avg_df.iloc[:, 1:5].values
+                # print('current background:')
+                # print(background_df)
 
-                # Read the sensor data as received from the reactor database and normalize it
-                sequence_df_ = sequence_df.loc[:, config.columns]
-                # print("Wanted Sequence (last 10 rows):")
-                # print(sequence_df_)
                 # Normalize the data
                 normalized_sequence = data_preparer.min_max_normalizer(
-                    sequence_df_, config.columns, config.path_for_normalization_summary, mode="normalize").values
-
-                # # Prepare the sequence for SHAP analysis
-                # # Formulate bacgkground by replacing the 4 redundant signals with the KF estimates, while keeping the rest of the signals as they are in the original sequence. This way we can analyze the contribution of the KF estimated signals to the anomaly detection.
-                # estimated nfd-4-flux
-                last_col_values = sequence_df.iloc[:, -1].values
-                # estimated nfd-3-pwr
-                second_last_col_values = sequence_df.iloc[:, -2].values
-                # estimated nfd-2-log
-                # third_last_col_values = sequence_df.iloc[:, -3].values
-                # estimated nfd-1-cps
-                fourth_last_col_values = sequence_df.iloc[:, -4].values
-
-                background_df = sequence_df_.copy()
-                # # Replace values of the fourth-third-second-last signals-column (keep name & order the same or the normalizer will be messed up) with the KF estimates
-                background_df.iloc[:, 0] = fourth_last_col_values
-                # background_df.iloc[:, 1] = third_last_col_values
-                background_df.iloc[:, 2] = second_last_col_values
-                background_df.iloc[:, 3] = last_col_values
-                # print("Sequence after dropping last column and replacing first column:")
-                # print(background_df)
+                    sequence_df, config.columns, config.path_for_normalization_summary, mode="normalize").values
 
                 normalized_background = data_preparer.min_max_normalizer(
                     background_df, config.columns, config.path_for_normalization_summary, mode="normalize").values
+
+                # print('current sequence:')
+                # print(normalized_sequence)
+                # print(normalized_background)
 
                 # # # Reshape for LSTM input (1, seq_len, input_dim)
                 current_seq = normalized_sequence.reshape(
                     1, config.seq_len, config.input_dim)
 
                 detector = AutoencoderDetector(model_)
-
                 error, output_seq, attn_weights, attn_matrix = detector.reconstruct_error(
                     current_seq)
 
@@ -316,26 +244,6 @@ def main():
         end_time = time.time()
         print(
             f"Total execution time: {(end_time - start_time)/60:.2f} minutes")
-
-        plt.figure(figsize=(14, 7))
-        plt.plot(errors, label="Reconstruction Error (MAE)", color='red')
-        plt.xlabel("Time step (s)")
-        plt.ylabel("MAE Reconstruction Error")
-        plt.title("Reconstruction Error over Time")
-        plt.grid(True)
-        plt.legend()
-        plt.show()
-
-        # plot estiamated vs true neutron population
-        plt.figure(figsize=(14, 7))
-        plt.plot(true_vals, label="True Neutron Population (CPS)", color='blue')
-        plt.plot(
-            est_vals, label="KF Estimated Neutron Population (CPS)", color='orange')
-        plt.xlabel("Time step (s)")
-        plt.ylabel("Neutron Population (CPS)")
-        plt.title("True vs KF Estimated Neutron Population")
-        plt.legend()
-        plt.show()
 
     # Run the function
 if __name__ == "__main__":
