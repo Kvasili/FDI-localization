@@ -65,6 +65,7 @@ def main():
 
     # Load dataset exclude the first column
     df = load_data(config.path_for_abnormal_data, config.columns, 1.0)
+    print(df.head())
     print(f"Data shape: {df.shape}")
 
     ##################################################################
@@ -110,8 +111,6 @@ def main():
     last_id = 0
     last_processed_idx = 0
 
-    true_vals = []
-    est_vals = []
     errors = []
 
     try:
@@ -166,11 +165,14 @@ def main():
                 # print('current sequence:')
                 # print(sequence_df)
                 background_df = sequence_df.copy()
-                background_df.iloc[:, 0:4] = avg_df.iloc[:, 1:5].values
-                # print('current background:')
-                # print(background_df)
+                # background_df.iloc[:, 0:4] = avg_df.iloc[:, 1:5].values
+                # This does not replaces the nfd-log
+                # background_df.iloc[:, [0, 2, 3]
+                #                    ] = avg_df.iloc[:, [1, 3, 4]].values
+                background_df[["nfd-1-cps", "nfd-3-pwr", "nfd-4-flux"]] = avg_df[[
+                    "nfd-1-cps-avg", "nfd-3-pwr-avg", "nfd-4-flux-avg"]].values
 
-                # Normalize the data
+                # Normalize the data and convert them to numpy array
                 normalized_sequence = data_preparer.min_max_normalizer(
                     sequence_df, config.columns, config.path_for_normalization_summary, mode="normalize").values
 
@@ -249,17 +251,3 @@ def main():
 if __name__ == "__main__":
 
     main()
-'''
-
-    LSTM Autoencoder for sensor diagnostics for windowSHAP analysis 
-
-    USAGE
-    python Attention_autoencoder_evaluate_Kalman_SHAP_DB.py
-
-    TODO:
-
-    - Export everything to a database table for later analysis and visualization (instead of csv)
-    - Set a threshold for the SHAP values to triger an alert. For now seems like 0.005 is a good threshold for the mean SHAP values, 
-       but this should be further analyzed and validated with more data and domain knowledge.
-
-'''

@@ -7,7 +7,7 @@ from deep_models.models import TimeseriesDataset
 @dataclass
 class Config:
 
-    csv_file: str = "./outputs/low_power_fdi_1_avg.csv"
+    csv_file: str = "./outputs/experiment_1/fdi_3_Kalman_test.csv"
     # csv_file: str = "./outputs/test_data.csv"
 
     epochs: int = 30
